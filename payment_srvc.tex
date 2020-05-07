@@ -1,0 +1,1067 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage[left=2cm,right=2cm,
+			top=2cm,bottom=2cm,bindingoffset=0cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1, T2A]{fontenc}
+\usepackage[russian]{babel}
+
+\usepackage{graphicx}
+\graphicspath{{img/}}
+\usepackage{float}
+\usepackage{subfigure}
+
+\usepackage{setspace}
+
+\usepackage{hyperref}
+\hypersetup{colorlinks, allcolors=[RGB]{0,0,0}}
+
+\usepackage{hyphenat}
+\hyphenation{ха-рак-те-рис-ти-ка}
+
+\usepackage{listings}
+\lstset{
+	extendedchars=true
+}
+\usepackage{minted}
+
+\frenchspacing
+
+\begin{document}
+	
+%оглавление
+\begin{spacing}{1.0}
+	\tableofcontents
+\end{spacing}
+\clearpage
+
+%документ
+	
+\section{Описание сервиса}
+
+\subsection{Назначение}\
+
+Сервис платежей представляет собой отдельную информационную базу, выполненную на платформе 1С. Предназначен для использования в качестве промежуточного звена при проведении платежных транзакций для удаленных продаж товаров.
+
+Возможна работа сервиса с несколькими юридическими лицами, несколькими ККМ (одна ККМ для одного юридического лица, одна ККМ для каждого подразделения одного юридического лица).
+
+Возможна работа сервиса с несколькими платежными страницами (одна платежная страница для одного юридического лица, одна платежная страница для каждого подразделения одного юридического лица).
+
+\subsection{Схема работы}\
+
+Предполагается следующая схема работы:
+
+\begin{enumerate}
+	\item Менеджер, получив от клиента согласие на оплату услуг/товаров, экспортирует в сервис счет на оплату.
+	\item Сервис формирует и отдает менеджеру короткую ссылку на страницу оплаты.
+	\item Менеджер произвольным транспортом доставляет полученную короткую ссылку клиенту.
+	\item Клиент переходит по полученной ссылке на страницу оплаты, нажимает на кнопку оплатить и переходит на страницу интерфейса платежной системы.
+	\item Сервис, получив данные об успешной оплате клиентом счета, проводит фискализацию операции, автоматически пробивая чек на ККМ.
+\end{enumerate}
+
+Промежуточная информационная база требуется по следующим причинам:
+
+\begin{enumerate}
+	\item Безопасность. В случае получения злоумышленником несанкционированного доступа к платежному сервису основная информационная база остается не скомпрометированной.
+	\item Отказоустойчивость. При отказе платежного сервиса основная информационная база сохраняет полную работоспособность.
+\end{enumerate}
+
+\section{Авторизация и аутентификация}
+
+Предполагается к использованию базовый тип аутентификации пользователей сервиса. Логин и пароль для доступа выдает администратор ИБ сервиса.
+
+\section{Перечень методов сервиса}
+
+Методы сервиса платежей:
+
+\begin{enumerate}
+	\item invoice — записывает счет на оплату в ИБ.
+	\item order-info — выдает полную информацию о запрошенном счете на оплату.
+	\item payment — устанавливает информацию об оплате счета, полученную от платежного шлюза банка.
+	\item order-status — выдает статус запрошенного счета.
+	\item order-cancel – отменяет счет на оплату, если это возможно.
+	\item invoice/data – позволяет записать/прочитать файл счета на оплату (печатную форму)
+\end{enumerate}
+
+\section{Коды ответов}
+
+Сервис возвращает следующие коды ответов:
+
+\begin{itemize}
+	\item 200 - во всех случаях, когда запрос может быть обработан системой.
+	\item 503 - обработка данных отключена.
+	\item Иные коды, предусмотренные стандартом HTTP в прочих случаях.
+\end{itemize}
+
+\section{Описание методов}
+
+\subsection{invoice}
+POST
+
+Производит импорт счета на оплату в ИБ сервиса.
+
+\paragraph{Входные данные}\
+
+В теле запроса метод принимает структуру, описывающую счет на оплату, в JSON.
+
+\begin{listing}[H]
+\begin{minted}[linenos=true,
+				xleftmargin=21pt,
+				tabsize=4]{json}
+	{
+	"id" : "", 
+	"order_date" : "",
+	"order_number" : "",
+	"incoming_date" : "2020.03.04 12:00",
+	"incoming_number" : "ТМТ0000015",
+	"company" : "ООО ТОП МОТО",
+	"company_uid" : "идентификатор_организации",
+	"departament": "HD Москва",
+	"departament_uid": "идентификатор_подразделения",
+	"customer" : "John Doe",
+	"customer_phone" : "",
+	"customer_email" : "",
+	"amount" : 2200.00,
+	"amount_of_payment" : 2200.00,
+	"amount_of_payment_without_VAT" : 2200,
+	"calculation_object": "ТОВАР",
+	"calculation_method": "АВАНС",
+	"VAT_RATE": "VAT_120",
+	"VAT": 200.00,
+	"payment_basis": "что-то для основания платежа",
+	"currency_code" : "643",
+	"order_status" : "",
+	"payment_deadline" : "2020-03-05T15:40:00Z",
+	"order_printed_form": [],
+	"items": [
+				{
+				"item": "КРЫЛО ЛЕВОЕ", 
+				"is_service": 0, 
+				"is_comission_item": 1, 
+				"artile": "", 
+				"count": 1.000, 
+				"cost": 1200.00, 
+				"sum": 1200.00, 
+				"VAT_rate": "VAT_NONE", 
+				"VAT": 0.00, 
+				"sum_with_VAT": 1200.00, 
+				"supplier": { 
+								"supplier_TIN": "7716536701", 
+								"supplier_name": "",
+								"supplier_phone": "723-58-95"
+							} 
+				}
+			]
+	} 
+\end{minted}
+\caption{Входной пакет метода invoice.} 
+\end{listing}
+
+\paragraph{Поля входной структуры}\
+
+\begin{itemize}
+	\item id - идентификатор счета на оплату в ИБ сервиса, строка.
+	\item date - дата счета на оплату в ИБ сервиса, строка.
+	\item number - номер счета на оплату в ИБ сервиса, строка.
+	\item incoming\_date - дата счета на оплату, передаваемая из внешней системы, строка, обязательный.
+	\item incoming\_number - номер счета на оплату, передаваемый из внешней системы, строка, обязательный.
+	\item company - наименование организации, строка.
+	\item company\_uid - идентификатор организации, строка, обязательный.
+	\item departament - наименование подразделения, строка.
+	\item departament\_uid - идентификатор подразделения, строка.
+	\item customer - плательщик, строка, обязательный.
+	\item customer\_phone - телефон плательщика, строка.
+	\item customer\_email - адрес электронной почты плательщика, строка.
+	\item amount - сумма счета на оплату, число.
+	\item amount\_of\_payment - сумма к оплате, число, обязательный.
+	\item amount\_of\_payment\_without\_VAT - сумма к оплате без НДС, число, обязательный.
+	\item calculation\_object - признак предмета расчета, строка, обязательный.
+	\item calculation\_method - признак метода расчета, строка, обязательный.
+	\item VAT\_RATE - ставка НДС, перечисления, обязательный.
+	\item VAT - сумма НДС, число.
+	\item payment\_basis - основание выполнения платежа, строка, обязательный.
+	\item currency\_code - код валюты, строка, обязательный.
+	\item currency - наименование валюты, сокращенное, строка.
+	\item order\_status - статус счета на оплату, перечисление.
+	\item payment\_deadline - дата, до которой необходимо оплатить счет, дата, обязательный.
+	\item items - массив товарных позиций, обязательный.
+	\item order\_printed\_form - структура, описывающая прикрепленные к счету на оплату файлы.
+\end{itemize}
+
+\paragraph{Поля структуры--элемента массива номенклатуры}\
+
+\begin{itemize}
+	\item item - наименование номенклатуры, строка, обязательный.
+	\item is\_service — признак услуги, 0 — товар, 1 — услуга. По умолчанию всегда товар.
+	\item is\_comission\_item — признак комиссионного товара, пока не обрабатывается, т. к. нет ясности как это делать. По умолчанию товар наш.
+	\item article - артикул номенклатуры, строка.
+	\item count - количество номенклатуры, число, обязательный.
+	\item cost - стоимость номенклатуры, число, обязательный.
+	\item sum - сумма номенклатуры, число, обязательный.
+	\item VAT\_rate - ставка НДС, перечисление, обязательный.
+	\item VAT - сумма НДС, число.
+	\item sum\_with\_VAT - сумма с НДС, число, обязательный.
+	\item supplier - данные поставщика номенклатуры. передавать обязательно при is\_comission\_item = 1
+	\item supplier\_TIN - ИНН поставщика номенклатуры, строка.
+	\item supplier\_name - наименование поставщика номенклатуры, строка.
+	\item supplier\_phone - телефон поставщика номенклатуры, строка.
+\end{itemize}
+
+Для плательщика необходимо передавать адрес электронной почты или телефон, для передачи данных ОФД.
+
+Нельзя передавать недействительный ИНН поставщика, т. к. ККМ может быть настроена на его проверку. В этом случае фискализация платежа не будет проведена.
+
+Сумма к оплате может не совпадать с суммой с НДС товаров/услуг в массиве номенклатуры, т.к. номенклатура передается только для информирования клиента.
+
+Идентификация счетов производится по входящему номеру и организации. Если они повторились, то система не создаст счет повторно, а выведет сообщение с ошибкой. Если необходимо выставить клиенту счет повторно — создайте его заново.
+
+\paragraph{Выходные данные}\
+
+Результат работы метода представляет собой структуру следующего вида.
+
+\begin{listing}[H]
+\begin{minted}[linenos=true,
+				xleftmargin=21pt,
+				tabsize=4]{json}
+{
+	"id": "35059545-758a-11ea-8119-0050568175b3",
+	"order_number": "ТМТ0000015",
+	"order_status": "NEW",
+	"order_shortlink": "h-dmoscow.shop/AsBScrqC"
+}
+\end{minted}
+\caption{Выходной пакет метода invoice.} 
+\end{listing}
+
+\paragraph{Поля результирующей структуры}\
+
+\begin{itemize}
+	\item id - идентификатор созданного в ИБ сервиса счета на оплату, строка.
+	\item order\_number - исходный номер счета на оплату, строка.
+	\item order\_date - исходная дата счета на оплату, строка.
+	\item order\_status — текущий статус в платежной системе, перечисление.
+	\item order\_shortlink — короткая ссылка, подлежащая передаче клиенту.
+\end{itemize}
+
+Метод осуществляет формирование короткой ссылки на загруженный документ. Предусмотреть обработку случая, когда в поле короткой ссылки будет возвращена пустая строка (сформировать короткую ссылку не удалось, но запись документа произведена корректно).
+
+\paragraph{Коды ошибок метода}\
+
+\begin{table}[H]
+	\centering
+	
+	\begin{tabular}{| c | p{6cm} | p{9cm} |}
+		\hline
+		Код & Сообщение & Описание \\
+		\hline
+		3 & parameter 'id' is not valid & Значение параметра не валидно \\
+		4 & invoice already exist & Счет с указанными входными реквизитами уже существует\\
+		5 & invoice is overdue & Дата оплаты счета меньше текущей \\
+		5 & data source not found & Источник данных не найден \\
+		6 & payments are not accepted & Неверный идентификатор организации, либо установлена блокировка платежей по организации \\
+		7 & parameter 'item' is not valid & Значение поля табличной части не валидно \\
+		9 & error saving data & Ошибка создания счета на оплату \\
+		10 & error saving data & Ошибка добавления данных о счете \\
+		\hline
+	\end{tabular}
+	\caption{Коды ошибок метода invoice.}
+\end{table}
+
+\subsection{order-info}
+POST
+
+Выдает полную информацию о счете на оплату, необходимую для показу клиенту и передаче платежному шлюзу.
+
+\paragraph{Входные данные}\
+
+В теле запроса метод принимает структуру с короткой ссылкой на счет на оплату, в JSON.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+	"order_shortlink": "VSzVMHCq"
+	}
+	\end{minted}
+	\caption{Входной пакет метода order-info.} 
+\end{listing}
+
+\paragraph{Поля входной структуры}\
+
+\begin{itemize}
+	\item order\_shortlink - сформированная методом invoice короткая ссылка на счет на оплату, строка, обязательный.
+\end{itemize}
+
+\paragraph{Выходные данные}\
+
+Если счет возможно оплатить, то отдается структура с полной информацией о счете на оплату.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+	"id": "6ad02b7e-7592-11ea-8119-0050568175b3",
+	"order_date": "2020-04-03T10:03:51Z",
+	"order_number": "000000019",
+	"incoming_date": "04.03.2020 12:00",
+	"incoming_number": "ТМТ0000019",
+	"company": "ООО ТОП МОТО",
+	"company_uid": "",
+	"departament": "HD Москва",
+	"departament_uid": "",
+	"customer": "John Doe",
+	"customer_phone": "",
+	"customer_email": "",
+	"amount": 2200.00,
+	"amount_of_payment": 2200.00,
+	"VAT_rate": "VAT_120",
+	"VAT": 200.00,
+	"currency_сode": "643",
+	"currency": "RUB",
+	"order_status": "NEW",
+	"items": [
+				{
+				"item": "КРЫЛО ЛЕВОЕ",
+				"is_service": 0,
+				"is_comission_item": 0,
+				"supplier": {
+								"supplier_phone": "",
+								"supplier_TIN": "",
+								"supplier_name": ""
+							},
+				"article": "",
+				"count": 1.000,
+				"cost": 1000.00,
+				"sum": 1000.00,
+				"VAT_rate": "VAT_NONE",
+				"VAT": 0.00,
+				"sum_with_VAT": 1000.00
+				}
+			],
+	"payment_deadline": "2020-03-05T12:40:00Z",
+	"order_printed_form": []
+	}
+	\end{minted}
+	\caption{Выходной пакет метода order-info в случае возможности оплатить счет.} 
+\end{listing}
+
+Если счет уже оплачен или отменен, то отдается структура с информацией о статусе счета на оплату.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+		"id": "6ad02b7e-7592-11ea-8119-0050568175b3",
+		"order_number": "ТМТ0000019",
+		"order_date": "04.03.2020 12:00",
+		"order_status": "CANCELED",
+		"amount": 2200.00,
+		"payment_system": "VISA",
+		"payment_date": "0001-01-01T00:00:00Z",
+		"fiscal_date": "0001-01-01T00:00:00Z"
+	}
+	\end{minted}
+\caption{Выходной пакет метода order-info в случае отмененного счета на оплату.} 
+\end{listing}
+
+В реквизите order\_printed\_form, если он заполнен отдается массив, элементы которого описывают присоединенные к счету на оплату файлы. Элементом массива является структура следующего вида:
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+		"id_file": "1a50cde1-7d9a-11ea-811a-0050568175b3",
+		"description": "Счет на оплату ТМТ000019 от 12.04.2020 г.",
+		"type": "invoice",
+		"format": "png",
+		"size": 4.92
+	}
+	\end{minted}
+	\caption{Структура, описывающая файл, прикрепленный к счету на оплату.}
+\end{listing}
+
+\begin{itemize}
+	\item id - идентификатор счета на оплату в ИБ сервиса, строка.
+	\item date - дата счета на оплату в ИБ сервиса, строка.
+	\item number - номер счета на оплату в ИБ сервиса, строка.
+	\item incoming\_date - дата счета на оплату, передаваемая из внешней системы, строка, обязательный.
+	\item incoming\_number - номер счета на оплату, передаваемый из внешней системы, строка, обязательный.
+	\item company\_uid - идентификатор организации, строка, обязательный.
+	\item customer - плательщик, строка, обязательный.
+	\item customer\_phone - телефон плательщика, строка.
+	\item customer\_email - адрес электронной почты плательщика, строка.
+	\item amount - сумма счета на оплату, число.
+	\item amount\_of\_payment - сумма к оплате, число, обязательный.
+	\item amount\_of\_payment\_without\_VAT - сумма к оплате без НДС, число, обязательный.
+	\item calculation\_object - признак предмета расчета, строка, обязательный.
+	\item calculation\_method - признак метода расчета, строка, обязательный.
+	\item VAT\_RATE - ставка НДС, перечисления, обязательный.
+	\item VAT - сумма НДС, число.
+	\item payment\_basis - основание выполнения платежа, строка, обязательный.
+	\item currency\_code - код валюты, строка, обязательный.
+	\item currency - наименование валюты, сокращенное, строка.
+	\item order\_status - статус счета на оплату, перечисление.
+	\item payment\_deadline - дата, до которой необходимо оплатить счет, дата, обязательный.
+	\item items - массив товарных позиций, обязательный.
+	\item order\_printed\_form - структура с описанием прикрепленных файлов, массив.
+	\item id\_file - идентификатор прикрепленного файла, строка.
+	\item description - описание прикрепленного файла, строка.
+	\item size - размер прикрепленного файла в килобайтах, число.
+	\item format - расширение прикрепленного файла, без точки, строка.
+	\item type - тип прикрепленного файла, перечисление.
+\end{itemize}
+
+\paragraph{Поля структуры-элемента массива номенклатуры}\
+
+\begin{itemize}
+	\item item - наименование номенклатуры, строка, обязательный.
+	\item is\_service — признак услуги, 0 — товар, 1 — услуга. По умолчанию всегда товар.
+	\item is\_comission\_item — признак комиссионного товара, пока не обрабатывается, т. к. нет ясности как это делать. По умолчанию товар наш.
+	\item article - артикул номенклатуры, строка.
+	\item count - количество номенклатуры, число, обязательный.
+	\item cost - стоимость номенклатуры, число, обязательный.
+	\item sum - сумма номенклатуры, число, обязательный.
+	\item VAT\_rate - ставка НДС, перечисление, обязательный.
+	\item VAT - сумма НДС, число.
+	\item sum\_with\_VAT - сумма с НДС, число, обязательный.
+	\item supplier - данные поставщика номенклатуры. передавать обязательно при is\_comission\_item = 1 (требуются фискальному регистратору)
+	\item supplier\_TIN - ИНН поставщика номенклатуры, строка.
+	\item supplier\_name - наименование поставщика номенклатуры, строка.
+	\item supplier\_phone - телефон поставщика номенклатуры, строка.
+\end{itemize}
+
+\paragraph{Поля структуры при невозможности оплатить счет}
+
+\begin{itemize}
+	\item id - идентификатор счета на оплату, строка.
+	\item order\_number - номер счета на оплату исходный, строка.
+	\item order\_date - дата счета на оплату исходная, строка.
+	\item order\_status - статус счета на оплату текущий, перечисление.
+	\item amount - сумма счета, число.
+	\item payment\_system - платежная система плательщика, перечисление.
+	\item payment\_date - дата платежа по счету, дата.
+	\item fiscal\_date - дата фискализации платежа.
+\end{itemize}
+
+\paragraph{Коды ошибок метода}\
+
+\begin{table}[H]
+	\centering
+	
+	\begin{tabular}{| c | p{7cm} | p{8cm} |}
+		\hline
+		Код & Сообщение & Описание \\
+		\hline
+		2 & parameter 'order\_shortlink' not found & Отсутствует обязательный параметр \\
+		3 & parameter 'order\_shortlink' is not valid & Значение параметра не валидно \\
+		\hline
+	\end{tabular}
+	\caption{Коды ошибок метода order-info.}
+\end{table}
+
+\subsection{payment}
+POST
+
+Производит запись информации об оплате счета с указанным идентификатором в ИБ сервиса.
+
+\paragraph{Входные данные}\
+
+Входная информация ожидается в виде структуры, в формате JSON.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+	"id":"806775a8-5edd-11ea-8118-0050568175b3",
+	"orderNumber":"ТМТ0000013",
+	"orderStatus":2,
+	"actionCode":0,
+	"actionCodeDescription":"",
+	"amount":400,
+	"currency":"643",
+	"date":"2020-04-09T08:09:22Z",
+	"orderDescription": "Платеж по счету ТМТ000000013 от 08.04.2020",
+	"ip":"77.108.110.33",
+	"merchantOrderParams":[],
+	"cardAuthInfo":{},
+	"paymentAmountInfo": {},
+	"bankInfo":{}
+	}
+	\end{minted}
+	\caption{Входной пакет метода payment.} 
+\end{listing}
+
+\paragraph{Поля входной структуры}\
+
+\begin{itemize}
+	\item id - идентификатор счета, для которого устанавливается оплата, строка, обязательный.
+	\item orderNumber -номер заказа, строка, обязательный.
+	\item orderStatus - статус заказа, строка.
+	\item actionCode - код результата, число, обязательный.
+	\item actionCodeDescription -описание результата, обязательный.
+	\item amount - сумма в копейках, число, обязательный.
+	\item currency - код валюты, строка.
+	\item date - дата транзакции, дата, обязательный.
+	\item orderDescription - описание платежа, строка.
+	\item ip - IP-адрес плательщика, строка, обязательный.
+	\item merchantOrderParams - дополнительные параметры заказа, массив.
+	\item cardAuthInfo - структура, описывающая карту, обязательный.
+	\item paymentAmountInfo - структура, описывающая платеж, обязательный.
+	\item bankInfo - структура, описывающая банк-эмитент карты.
+\end{itemize}
+
+Помимо указанных реквизитов, ответ платежного шлюза может содержать дополнительную информацию.
+
+\paragraph{Выходные данные}\
+
+Выходные данные - структура в JSON, описывающая текущее состояние счета на оплату. Статус счета устанавливается в Оплачен.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+	"id": "6ad02b7e-7592-11ea-8119-0050568175b3",
+	"order_number": "ТМТ0000019",
+	"order_date": "04.03.2020 12:00",
+	"order_status": "PAID",
+	"amount": 4.00,
+	"payment_system": "VISA",
+	"payment_date": "2020-04-09T08:09:22Z",
+	"fiscal_date": "0001-01-01T00:00:00Z"
+	}
+	
+	\end{minted}
+	\caption{Выходной пакет метода payment.} 
+\end{listing}
+
+\paragraph{Поля результирующей структуры}\
+
+\begin{itemize}
+	\item id - идентификатор счета на оплату, строка.
+	\item order\_number - номер счета на оплату исходный, строка.
+	\item order\_date - дата счета на оплату исходная, строка.
+	\item order\_status - статус счета на оплату текущий, перечисление.
+	\item amount - сумма счета, число.
+	\item payment\_system - платежная система плательщика, перечисление.
+	\item payment\_date - дата платежа по счету, дата.
+	\item fiscal\_date - дата фискализации платежа.
+\end{itemize}
+
+\paragraph{Коды ошибок метода}\
+
+\begin{table}[H]
+	\centering
+	
+	\begin{tabular}{| c | p{7cm} | p{8cm} |}
+		\hline
+		Код & Сообщение & Описание \\
+		\hline
+		2 & parameter 'id' not found & Отсутствует обязательный параметр \\
+		3 & parameter 'parameter 'id' is not valid & Значение параметра не валидно \\
+		11 & payment cannot be accepted & Статус счета не позволяет принять оплату (не Новый) \\
+		12 & field amount not found & Ошибка разбора данных транзакции \\
+		13 & error saving data & Ошибка сохранения данных платежа \\
+		14 & error saving data & Ошибка изменения статуса счета после оплаты \\
+		\hline
+	\end{tabular}
+	\caption{Коды ошибок метода payment.}
+\end{table}
+
+\subsection{order-status}
+POST
+
+Выдает краткую информацию о текущем статусе счета на оплату.
+
+\paragraph{Входные данные}\
+
+В теле запроса метод принимает структуру с идентификатором счета на оплату, в JSON.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+	"id": "35059545-758a-11ea-8119-0050568175b3"
+	}
+	\end{minted}
+	\caption{Входной пакет метода order-status.} 
+\end{listing}
+
+\paragraph{Поля входной структуры}\
+
+\begin{itemize}
+	\item id - идентификатор счета на оплату, строка, обязательный.
+\end{itemize}
+
+\paragraph{Выходные данные}\
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+	"id": "806775a8-5edd-11ea-8118-0050568175b3",
+	"order_number": "ТМТ0000009",
+	"order_date": "04.03.2020 12:00",
+	"order_status": "PAID",
+	"amount": 2200.00,
+	"payment_system": "VISA",
+	"payment_date": "2020-03-05T15:23:14Z",
+	"fiscal_date": "2020-03-04T21:00:00Z"
+	}
+	\end{minted}
+	\caption{Выходной пакет метода order-status.} 
+\end{listing}
+
+\paragraph{Поля результирующей структуры}\
+
+\begin{itemize}
+	\item id - идентификатор счета на оплату, строка.
+	\item order\_number - номер счета на оплату исходный, строка.
+	\item order\_date - дата счета на оплату исходная, строка.
+	\item order\_status - статус счета на оплату текущий, перечисление.
+	\item amount - сумма счета, число.
+	\item payment\_system - платежная система плательщика, перечисление.
+	\item payment\_date - дата платежа по счету, дата.
+	\item fiscal\_date - дата фискализации платежа.
+\end{itemize}
+
+\paragraph{Коды ошибок метода}\
+
+\begin{table}[H]
+	\centering
+	
+	\begin{tabular}{| c | p{7cm} | p{8cm} |}
+		\hline
+		Код & Сообщение & Описание \\
+		\hline
+		2 & parameter 'id' not found & Обязательный параметр не найден \\
+		3 & parameter 'id' is not valid & Значение параметра не валидно \\
+		\hline
+	\end{tabular}
+	\caption{Коды ошибок метода order-status.}
+\end{table}
+
+\subsection{order-cancel}
+POST
+
+Производит отмену счета на оплату. Отмена возможна только для счетов, которые были не оплачены и не отменены ранее.
+
+\paragraph{Входные данные}\
+
+В теле запроса метод принимает структуру с идентификатором счета на оплату, в JSON.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+	"id": "35059545-758a-11ea-8119-0050568175b3"
+	}
+	\end{minted}
+	\caption{Входной пакет метода order-cancel.} 
+\end{listing}
+
+\paragraph{Поля входной структуры}\
+
+\begin{itemize}
+	\item id - идентификатор счета на оплату, строка, обязательный.
+\end{itemize}
+
+\paragraph{Выходные данные}\
+
+Формат выходных данных соответствует методу order-status. Статус счета устанавливается в Отменен.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+	"id": "806775a8-5edd-11ea-8118-0050568175b3",
+	"order_number": "ТМТ0000009",
+	"order_date": "04.03.2020 12:00",
+	"order_status": "PAID",
+	"amount": 2200.00,
+	"payment_system": "VISA",
+	"payment_date": "2020-03-05T15:23:14Z",
+	"fiscal_date": "2020-03-04T21:00:00Z"
+	}
+	\end{minted}
+	\caption{Выходной пакет метода order-cancel.} 
+\end{listing}
+
+\paragraph{Поля результирующей структуры}\
+
+\begin{itemize}
+	\item id - идентификатор счета на оплату, строка.
+	\item order\_number - номер счета на оплату исходный, строка.
+	\item order\_date - дата счета на оплату исходная, строка.
+	\item order\_status - статус счета на оплату текущий, перечисление.
+	\item amount - сумма счета, число.
+	\item payment\_system - платежная система плательщика, перечисление.
+	\item payment\_date - дата платежа по счету, дата.
+	\item fiscal\_date - дата фискализации платежа.
+\end{itemize}
+
+\paragraph{Коды ошибок метода}\
+
+\begin{table}[H]
+	\centering
+	
+	\begin{tabular}{| c | p{6cm} | p{9cm} |}
+		\hline
+		Код & Сообщение & Описание \\
+		\hline
+		2 & parameter 'id' not found & Обязательный параметр не найден \\
+		3 & parameter 'id' is not valid & Значение параметра не валидно \\
+		4 & invoice not found & Идентификатор счета не соответствует ни одному счету на оплату \\
+		5 & incorrect status of invoice & Статус счета не позволяет выполнить отмену \\
+		5 & invoice already canceled & Счет уже отменен \\
+		5 & invoice already payment & Счет оплачен, отмена не возможна \\
+		14 & error saving data & Ошибка операции отмены счета на оплату \\
+		\hline
+	\end{tabular}
+	\caption{Коды ошибок метода order-cancel.}
+\end{table}
+
+\subsection{invoice/data}
+GET, POST, DELETE
+
+Методы позволяют импортировать документы различных видов и форматов для указанного счета на оплату, а также получать эти документы и удалять их.
+
+\paragraph{Входные данные}\
+
+\subparagraph{Добавление файла}\
+
+Метод POST
+
+Добавление файла производится отправлением на url вида \textbf{invoice/data/\{id\}} составного сообщения, первой частью которого является структура с именем \textbf{metadata}, описывающая передаваемые файлы. Второй и последующими частями (при их наличии) следуют файлы в двоичном виде. Имя каждой части ожидается как \textbf{name\{i\}}, где i - порядковый номер файла в теле запроса. Между собой все части разделены пустыми строками и разделителем.
+
+Запрос должен иметь заголовок, указывающий на тип содержимого файла: \textbf{Content-Type : multipart/form-data}. Обязательно должно передаваться значение разделителя (boundary). 
+
+Каждая часть должна начинаться заголовками, указывающими на ее тип. Часть с метаданными предваряется заголовком \textbf{Content-Disposition: form-data; name=metadata}. Части с файлами предваряются заголовками \textbf{Content-Disposition: form-data; name=name\{i\}}.
+
+Пример сформированного составного сообщения приведен в листинге ниже.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{perl}
+	<Пустая строка>
+	==Asrf456BGe4h
+	Content-Disposition: form-data; name=metadata
+	<Пустая строка>
+	{	
+	"id": "806775a8-5edd-11ea-8118-0050568175b3",
+	"items": [
+				{
+				"description": "Счет на оплату ТМТ000019 от 12.04.2020 г.",
+				"type": "invoice",
+				"format": "png"
+				},
+				{
+				"description": "Рекламная листовка HD STREET ROD 2020 г.",
+				"type": "flyer",
+				"format": "jpeg"
+				}
+			]
+	}	
+	<Пустая строка>
+	==Asrf456BGe4h
+	Content-Disposition: form-data; name=name1; filename=v8_20E4_1a;
+	<Пустая строка>
+	<Двоичные данные первого файла>
+	<Пустая строка>
+	==Asrf456BGe4h
+	Content-Disposition: form-data; name=name2; filename=v8_20E4_2a;
+	<Пустая строка>
+	<Двоичные данные второго файла>
+	==Asrf456BGe4h==
+	\end{minted}
+	\caption{Пример составного HTTP-сообщения на добавление файла/файлов.}
+\end{listing}
+
+\subparagraph{Получение файла}\
+
+Метод GET
+
+Получение всех файлов, ранее добавленных к счету на оплату, производится обращением на url вида \textbf{invoice/data/\{id\}}.
+
+Получение всех файлов указанного типа, ранее добавленных к счету на оплату, производится обращением на url вида \textbf{invoice/data/\{id\}/\{type\}}.
+
+Получение конкретного файла, ранее добавленного к счету на оплату, производится обращением на url вида \textbf{invoice/data/\{id\}/\{type\}/\{id\_file\}}.
+
+\subparagraph{Удаление файла}\
+
+Метод DELETE
+
+Удаление всех файлов, ранее добавленных к счету на оплату, производится обращением на url вида \textbf{invoice/data/\{id\}}.
+
+Удаление всех файлов указанного типа, ранее добавленных к счету на оплату, производится обращением на url вида \textbf{invoice/data/\{id\}/\{type\}}.
+
+Удаление конкретного файла, ранее добавленного к счету на оплату, производится обращением на url вида \textbf{invoice/data/\{id\}/\{type\}/\{id\_file\}}.
+
+\paragraph{Параметры url}\
+
+Во всех случаях:
+\begin{itemize}
+	\item id - идентификатор счета на оплату, полученный методом invoice, строка.
+	\item type - тип файла, перечисление.
+	\item format - расширение файла, строка.
+	\item id\_file - идентификатор файла, строка.
+\end{itemize}
+
+\paragraph{Выходные данные}\
+
+\subparagraph{Добавление файла}\
+
+В теле ответа возвращается структура с массивом, описывающая добавленные файлы, в JSON.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+		"id": "идентификатор_счета_на_оплату",
+		"items": [
+					{
+						"id_file": "1a50cde1-7d9a-11ea-811a-0050568175b3",
+						"description": "Счет на оплату ТМТ000019 от 12.04.2020 г.",
+						"type": "invoice",
+						"format": "png",
+						"size": 4.92
+					}
+				]
+	}
+	\end{minted}
+	\caption{Выходной пакет операции добавления файла}
+\end{listing}
+
+\subparagraph{Получение файла/файлов}\
+
+Результатом работы метода является составное HTTP-сообщение, содержащее внутри себя несколько вложенных сообщений.
+
+Первой частью сообщения с именем \textbf{metadata} является структура в JSON, описывающая файлы, соответствующие запросу.
+
+Второй и последующими частями (при наличии) являются файлы в двоичном виде. Каждая часть имеет имя вида \textbf{name\{i\}}, где i - порядковый номер файла. Также каждая из данных частей имеет атрибут \textbf{id\_file}.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{	
+	"id": "806775a8-5edd-11ea-8118-0050568175b3",
+	"items": [
+				{
+				"id_file": "d29bb323-7d9f-11ea-811a-0050568175b3",
+				"description": "",
+				"type": "invoice",
+				"format": "png",
+				"size": 5042
+				},
+				{
+				"id_file": "d29bb322-7d9f-11ea-811a-0050568175b3",
+				"description": "",
+				"type": "invoice",
+				"format": "png",
+				"size": 5042
+				}
+			]
+	}
+	\end{minted}
+	\caption{Первая часть составного HTTP-сообщения -- результата операции чтения файла/файлов}
+\end{listing}	
+
+\subparagraph{Удаление файла/файлов}\
+
+В теле метода возвращается структура с описанием удаляемых файлов, в JSON.
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+	{
+	"id": "806775a8-5edd-11ea-8118-0050568175b3",
+	"items": [
+				{
+				"id_file": "f7ea203e-7d99-11ea-811a-0050568175b3",
+				"description": "Счет на оплату ТМТ000019 от 12.04.2020 г.",
+				"type": "invoice",
+				"format": "png",
+				"size": 5042
+				},
+				{
+				"id_file": "1a50cde1-7d9a-11ea-811a-0050568175b3",
+				"description": "",
+				"type": "invoice",
+				"format": "png",
+				"size": 5042
+				}
+			]
+	}
+	\end{minted}
+	\caption{Выходной пакет операции удаления файла/файлов}
+\end{listing}
+
+\paragraph{Поля результирующих структур}\
+
+\begin{itemize}
+	\item id - идентификатор счета на оплату, строка.
+	\item items - массив структур, описывающих файлы.
+	\item id\_file - идентификатор файла, строка.
+	\item description - описание файла, строка.
+	\item type - тип файла, перечисление.
+	\item format - формат файла, его расширение.
+	\item size - размер файла, в килобайтах.
+\end{itemize}
+
+\paragraph{Коды ошибок метода}\
+
+\subparagraph{Ошибки при сохранении файла}\
+
+\begin{table}[H]
+	\centering
+	\begin{tabular}{| c | p{7cm} | p{8cm} |}
+		\hline
+		Код & Сообщение & Описание \\
+		\hline
+		2 & parameter 'id' not found & Отсутствует обязательный параметр \\
+		3 & parameter 'id' is not valid & Значение параметра не валидно \\
+		4 & missing expected header or its value is incorrect & Обязательные заголовки отсутствуют, либо некорректны) \\
+		5 & content size exceeds maximum & Превышение максимального размера файла \\
+		6 & message parsing error & Ошибка разбора сообщения \\
+		7 & file saving error & Ошибка сохранения файла \\
+		\hline
+	\end{tabular}
+	\caption{Коды ошибок метода invoice/data при сохранении файла.}
+\end{table}
+
+\subparagraph{Ошибки при получении файла}\
+\begin{table}[H]
+	\centering
+	
+	\begin{tabular}{| c | p{7cm} | p{8cm} |}
+		\hline
+		Код & Сообщение & Описание \\
+		\hline
+		2 & parameter 'id' not found & Отсутствует обязательный параметр \\
+		3 & parameter 'id\_file' is not valid & Значение параметра не валидно \\
+		4 & error receiving file & Ошибка при получении файла. Например, файл отсутствует. \\
+		\hline
+	\end{tabular}
+	\caption{Коды ошибок метода invoice/data при получение файла.}
+\end{table}
+
+\subparagraph{Ошибки при удалении файла}\
+\begin{table}[H]
+	\centering
+	
+	\begin{tabular}{| c | p{7cm} | p{8cm} |}
+		\hline
+		Код & Сообщение & Описание \\
+		\hline
+		2 & parameter 'id' not found & Отсутствует обязательный параметр \\
+		3 & parameter 'type' has an invalid value & Значение параметра не валидно \\
+		4 & missing expected header or its value is incorrect & Обязательные заголовки отсутствуют, либо некорректны \\
+		5 & content size exceeds maximum & Превышение максимального размера файла \\
+		6 & content is missing & В запросе нет тела файла \\
+		7 & file saving error & Ошибка сохранения файла \\
+		\hline
+	\end{tabular}
+	\caption{Коды ошибок метода invoice/data при удалении файла.}
+\end{table}
+
+\section{Доступность методов}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{| c | l | p{6,5cm} | p{2cm} | p{2cm} |}
+\hline
+N & Метод & URL & Для платежной страницы & Для базы источника \\
+\hline
+1 & invoice & /invoice & -- & + \\
+2 & order-info & /order-info & + & -- \\
+3 & payment & /payment & + & -- \\
+\hline
+4 & order-status & /order-status & -- & + \\
+5 & order-cancel & /order-cancel & -- & + \\
+6 & invoice/data, POST & /invoice/data/\{id\} & -- & + \\
+\hline
+7 & invoice/data, GET & /invoice/data/\{id\} & + & + \\
+8 & invoice/data, GET & /invoice/data/\{id\}/\{type\} & + & + \\
+9 & invoice/data, GET & /invoice/data/\{id\}/\{type\}/\{id\_file\} & + & + \\
+\hline
+10 & invoice/data, DELETE & /invoice/data/\{id\} & - & + \\
+11 & invoice/data, DELETE & /invoice/data/\{id\}/\{type\} & - & + \\
+12 & invoice/data, DELETE & /invoice/data/\{id\}/\{type\}/\{id\_file\} & - & + \\
+\hline
+\end{tabular}
+\caption{Доступность методов сервиса}
+\end{table}
+
+\section{Перечисления}
+
+В сервисе используются следующие перечисления:
+\begin{enumerate}
+	\item VAT\_RATE - ставка НДС; принимает следующие значения: VAT\_NONE, VAT\_10, VAT\_20, VAT\_120 (Без НДС, НДС 10\%, НДС 20\%, НДС 20/120\% соответственно).
+	\item status\_order - статус счета на оплату; принимает следующие значения: NEW, PAID, CANCEL (Новый, Оплачен, Отменен соответственно).
+	\item calculation\_object - признак предмета расчета; принимает следующие значения: Товар, Работа, Услуга, Платеж, АгентскоеВознаграждение, ИнойПредметРасчета, ВнереализационныйДоход.
+	\item calculation\_method - признак способа расчета; принимает следующие значения: ПолнаяПредварительнаяОплата, ЧастичнаяПредварительнаяОплата, Аванс, ПолныйРасчет, ОплатаПредметаРасчетаПослеПередачиВКредит.
+	\item type - типы документов, поддерживаемые сервисом; принимает следующие значения: invoice.
+	\item payment\_system - наименование платежной системы, принимает следующие значения: VISA, МИР, Diners Club, JCB International, American Express, Maestro, MasterCard, Discover, China UnionPay, УЭК.
+\end{enumerate}
+
+\section{Обработка ошибок}
+
+Сообщения об ошибках для всех методов имеют вид следующей структуры:
+
+\begin{listing}[H]
+	\begin{minted}[linenos=true,
+	xleftmargin=21pt,
+	tabsize=4]{json}
+{
+	"code": 3,
+	"description": "parameter 'id' is not valid"
+}
+\end{minted}
+\caption{Выходной пакет любого метода в случае ошибки} 
+\end{listing}
+
+Каждый метод имеет свою нумерацию кодов ошибок. Смотрите перечень кодов ошибок и их значение в описаниях соответствующих методов.
+
+\section{Фискализация продаж}
+
+Реализован процесс автоматической фискализации продаж. Для его выполнения сервис автоматически определяет на основе переданного при загрузке счета на оплату идентификатора организации (и подразделения - если для организации ведется учет по подразделениям) на какой ККМ необходимо осуществлять пробитие чека.
+
+ККМ должна быть постоянно включенной в сеть питания, быть подключенной к компьютерной сети холдинга.
+
+Выполнение фискализации продаж осуществляется регламентным заданием с установленным периодом в 5 минут.
+
+Рассылка электронных чеков покупателям осуществляется оператором фискальных данных. Данные для отправки загружаются вместе со счетом на оплату.
+
+Необходимо обращать особое внимание на корректность форматов телефона и электронного адреса. Телефон принимается в формате 7ХХХХХХХХХ, электронный адрес принимается в формате <строка>@<строка>. При указании неверных данных повторная рассылка электронного чека невозможна. 
+
+При указании и номера телефона и электронного адреса приоритет отдается электронному адресу.
+
+\newpage
+\appendix
+\section{ПРИЛОЖЕНИЕ}
+
+Данное приложение содержит проектную структуру информационной базы, кратко описывающую реквизиты всех используемых объектов.
+
+\begin{figure}[H]
+	\includegraphics[width=\linewidth]{c20200507_1}
+	\caption{Структура таблиц информационной базы.}
+\end{figure}
+
+\begin{figure}[H]
+	\includegraphics[width=\linewidth]{c20200507_2}
+	\caption{Структура таблиц информационной базы.}
+\end{figure}
+
+\end{document}
